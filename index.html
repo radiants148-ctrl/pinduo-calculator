@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Доставка с Pinduoduo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;700&family=Unbounded:wght@600&display=swap" rel="stylesheet">
+<style>
+/* Палитра: холодная бумага, чернильный текст, один синий акцент; зелёный только для «выгоднее».
+   Раскладка: одна колонка 560px, карточки товаров, закреплённая полоса с итогом. */
+:root {
+  --bg: #f2f4f7;
+  --surface: #ffffff;
+  --field: #f6f8fa;
+  --ink: #121c27;
+  --muted: #5b6876;
+  --line: #dbe1e8;
+  --accent: #2347d9;
+  --accent-ink: #ffffff;
+  --good: #0f7a3d;
+  --good-bg: #e3f4ea;
+  --warn: #8a5a00;
+  --warn-bg: #fff1cf;
+  --font-body: "Onest", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Unbounded", "Onest", system-ui, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e141b; --surface: #16202a; --field: #0f171f; --ink: #e8edf2; --muted: #93a1b0;
+    --line: #2a3744; --accent: #7a96ff; --accent-ink: #0e141b; --good: #5fd391; --good-bg: #123524;
+    --warn: #f0c05a; --warn-bg: #3a2d0c; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e141b; --surface: #16202a; --field: #0f171f; --ink: #e8edf2; --muted: #93a1b0;
+  --line: #2a3744; --accent: #7a96ff; --accent-ink: #0e141b; --good: #5fd391; --good-bg: #123524;
+  --warn: #f0c05a; --warn-bg: #3a2d0c; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body);
+  font-size: 15px; line-height: 1.45; padding: 20px 16px 110px;
+}
+main { max-width: 560px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+h1 { font-family: var(--font-display); font-weight: 600; font-size: 22px; line-height: 1.2; margin: 0 0 6px; text-wrap: balance; }
+h2 { font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 0; font-weight: 700; }
+p { margin: 0; }
+.lead { color: var(--muted); max-width: 52ch; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+details > summary { cursor: pointer; font-weight: 700; list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+details > summary::-webkit-details-marker { display: none; }
+details > summary::after { content: "Свернуть"; font-weight: 500; font-size: 13px; color: var(--muted); }
+details:not([open]) > summary::after { content: "Изменить"; }
+.settings { display: flex; flex-direction: column; gap: 14px; margin-top: 14px; }
+.group { display: flex; flex-direction: column; gap: 8px; }
+.group > .gt { font-size: 13px; font-weight: 700; color: var(--muted); }
+.fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.fields.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+label.f { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); min-width: 0; }
+input[type="text"] {
+  width: 100%; min-width: 0; font: inherit; font-size: 16px; color: var(--ink); background: var(--field);
+  border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px;
+}
+input:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.seg label { position: relative; }
+.seg input { position: absolute; opacity: 0; inset: 0; }
+.seg span {
+  display: block; text-align: center; padding: 10px 8px; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--field); font-weight: 500;
+}
+.seg input:checked + span { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.seg input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.hint { font-size: 12px; color: var(--muted); }
+.scan { display: grid; gap: 10px; padding: 14px; margin-bottom: 12px; }
+.scan[hidden] { display: none; }
+.scan .st { font-size: 14px; }
+.scan .err { color: #b3261e; font-size: 13px; }
+@media (prefers-color-scheme: dark) { .scan .err { color: #ff8a80; } }
+.scan input[type=file] { font-size: 14px; max-width: 100%; }
+.modebar { margin: 8px 0 12px; }
+
+.chk { display: flex; gap: 8px; align-items: center; font-size: 14px; }
+.chk input { width: 18px; height: 18px; accent-color: var(--accent); }
+.list-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+#list { display: flex; flex-direction: column; gap: 12px; }
+.item { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.item .top { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+.del { width: 42px; border: 1px solid var(--line); background: var(--field); color: var(--muted); border-radius: 10px; font-size: 20px; cursor: pointer; }
+.res { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.opt { border: 1px solid var(--line); border-radius: 10px; padding: 8px; display: flex; flex-direction: column; gap: 2px; min-width: 0; background: var(--field); }
+.opt .l { font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
+.opt .v { font-weight: 700; font-variant-numeric: tabular-nums; font-size: 14px; }
+.opt.best { background: var(--good-bg); border-color: var(--good); }
+.opt.best .v, .opt.best .l { color: var(--good); }
+.opt.off { opacity: .55; }
+.verdict { font-size: 13px; color: var(--muted); }
+.verdict b { color: var(--ink); }
+.btns { display: flex; gap: 8px; flex-wrap: wrap; }
+button.btn { font: inherit; font-weight: 700; border-radius: 10px; padding: 10px 14px; cursor: pointer; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+button.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+button.btn.small { font-size: 13px; padding: 7px 10px; font-weight: 500; align-self: flex-start; }
+.sum { display: flex; flex-direction: column; gap: 12px; }
+.sum table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.sum td { padding: 8px 0; border-top: 1px solid var(--line); vertical-align: top; }
+.sum td:last-child { text-align: right; font-weight: 700; white-space: nowrap; padding-left: 12px; }
+.sum tr.best td { color: var(--good); font-weight: 700; }
+.sum tr.grp td { color: var(--accent); font-weight: 700; padding-top: 12px; }
+.sum tr.grp:first-child td { padding-top: 8px; border-top: 0; }
+.sum tr.tot td { font-size: 17px; font-weight: 700; border-top: 2px solid var(--ink); padding-top: 10px; }
+.plan-sub { font-size: 12px; color: var(--muted); font-weight: 400; }
+textarea.copybox { width: 100%; min-height: 120px; font: inherit; font-size: 14px; background: var(--field); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+.bar {
+  position: fixed; left: 0; right: 0; bottom: 0; background: var(--surface); border-top: 1px solid var(--line);
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+}
+.bar-in { max-width: 560px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.bar .big { font-family: var(--font-display); font-size: 18px; font-variant-numeric: tabular-nums; }
+.bar .sub { font-size: 12px; color: var(--muted); }
+.foot { font-size: 12px; color: var(--muted); }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Доставка с Pinduoduo: бесплатная или карго?</h1>
+    <p class="lead">Добавь товары из корзины. Для каждого посчитаем цену с НДС и комиссией против твоего карго и Jana Post.</p>
+  </header>
+
+  <section class="card">
+    <details id="settingsBox" open>
+      <summary>Мои настройки</summary>
+      <div class="settings">
+        <div class="group">
+          <div class="gt">Чем платишь на Pinduoduo</div>
+          <div class="seg" role="radiogroup" aria-label="Карта">
+            <label><input type="radio" name="card" value="nofee"><span>Карта без комиссии</span></label>
+            <label><input type="radio" name="card" value="fee"><span>Карта с комиссией</span></label>
+          </div>
+          <div class="fields">
+            <label class="f">Комиссия карты, %<input type="text" inputmode="decimal" data-s="cardFee" id="cardFee"></label>
+            <label class="f">НДС, %<input type="text" inputmode="decimal" data-s="vat" id="vat"></label>
+          </div>
+        </div>
+
+        <div class="group">
+          <div class="gt">Мой карго</div>
+          <div class="fields">
+            <label class="f">Название<input type="text" data-s="cargoName" id="cargoName"></label>
+            <label class="f">Тариф, $ за 1 кг<input type="text" inputmode="decimal" data-s="cargoTariff" id="cargoTariff"></label>
+          </div>
+        </div>
+
+        <div class="group">
+          <div class="gt">Jana Post</div>
+          <div class="fields">
+            <label class="f">Тариф, $ за 1 кг<input type="text" inputmode="decimal" data-s="janaTariff" id="janaTariff"></label>
+          </div>
+        </div>
+
+        <div class="group">
+          <div class="gt">Курсы</div>
+          <div class="fields">
+            <label class="f">1 ¥ в тенге<input type="text" inputmode="decimal" data-s="cny" id="cny"></label>
+            <label class="f">1 $ в тенге<input type="text" inputmode="decimal" data-s="usd" id="usd"></label>
+          </div>
+          <p class="hint" id="ratesHint"></p>
+          <button class="btn small" id="ratesReset" type="button" hidden>Вернуть автокурс</button>
+        </div>
+      </div>
+    </details>
+  </section>
+
+  <section>
+    <div class="list-head">
+      <h2>Товары</h2>
+      <span class="hint">Начни вводить название, появятся подсказки</span>
+    </div>
+  </section>
+  <div class="modebar seg" role="radiogroup" aria-label="Как добавить товары">
+    <label><input type="radio" name="mode" value="manual" checked><span>Вручную</span></label>
+    <label><input type="radio" name="mode" value="scan"><span>По скриншоту</span></label>
+  </div>
+  <section class="card scan" id="scanBox" hidden>
+    <div id="scanLogin">
+      <p class="st">Загрузи скриншот корзины или товара, а мы сами заполним цены, количество и вес. Для этого нужно войти через Telegram. Первые 3 дня бесплатно, до 10 скриншотов в день.</p>
+      <div id="tgBtn"></div>
+      <p class="err" id="loginErr" hidden></p>
+    </div>
+    <div id="scanApp" hidden>
+      <p class="st" id="scanStatus"></p>
+      <input type="file" id="scanFile" accept="image/*">
+      <div class="btns"><button class="btn primary" id="scanGo" type="button">Распознать</button>
+      <button class="btn" id="scanOut" type="button">Выйти</button></div>
+      <p class="hint" id="scanMsg"></p>
+      <p class="err" id="scanErr" hidden></p>
+    </div>
+  </section>
+  <div id="list"></div>
+  <datalist id="products"></datalist>
+  <div class="btns">
+    <button class="btn primary" id="add" type="button">+ Добавить товар</button>
+    <button class="btn" id="clear" type="button">Очистить список</button>
+  </div>
+  <p class="hint" id="exampleHint">Сейчас в списке примеры. Нажми «Очистить список» и вводи свои товары.</p>
+
+  <section class="card sum" id="summary" aria-live="polite">
+    <h2>Что и как заказывать</h2>
+    <table><tbody id="planRows"></tbody></table>
+    <p class="hint" id="mixNote"></p>
+    <h2>Вся корзина одним способом</h2>
+    <table><tbody id="sumRows"></tbody></table>
+    <div class="btns">
+      <button class="btn primary" id="copy" type="button">Скопировать как текст</button>
+      <button class="btn" id="copyTsv" type="button">Скопировать таблицей</button>
+    </div>
+    <span class="hint" id="copyStatus" role="status"></span>
+    <textarea class="copybox" id="copybox" readonly hidden aria-label="Текст расчёта"></textarea>
+  </section>
+
+  <p class="foot">Расчёт приблизительный. Курсы и тарифы меняются. У громоздких товаров карго считает по объёмному весу, он может быть больше реального. НДС 16% действует с 1 января 2026. Сервис не связан с Pinduoduo, Jana Post и карго.</p>
+</main>
+
+<div class="bar">
+  <div class="bar-in">
+    <div>
+      <div class="sub">Итого по лучшему варианту</div>
+      <div class="big" id="barTotal">0 ₸</div>
+    </div>
+    <div class="sub" id="barSave" style="text-align:right"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  /* Курс Нацбанка. Меняется раз в день: обновляются только эти три значения. */
+  var RATES = { cny: 66.59, usd: 444.3, date: "14.11.2026" };
+
+  /* Подсказки: название и примерный вес одной штуки, кг. Нет в списке: пользователь вводит вес сам. */
+  var PRESETS = [
+    ["Футболка", 0.25], ["Рубашка", 0.3], ["Лонгслив", 0.3], ["Худи", 0.7], ["Толстовка", 0.7], ["Свитшот", 0.6],
+    ["Свитер", 0.6], ["Кофта", 0.5], ["Джинсы", 0.6], ["Брюки", 0.5], ["Штаны", 0.5], ["Леггинсы", 0.25], ["Шорты", 0.3],
+    ["Юбка", 0.3], ["Платье", 0.35], ["Пижама", 0.5], ["Спортивный костюм", 0.9], ["Куртка", 1.2], ["Пуховик", 1.6],
+    ["Пальто", 1.5], ["Жилетка", 0.5], ["Нижнее бельё", 0.08], ["Бюстгальтер", 0.1], ["Топ", 0.15], ["Носки (пара)", 0.06],
+    ["Колготки", 0.1], ["Шапка", 0.15], ["Шарф", 0.2], ["Перчатки", 0.1], ["Ремень", 0.2], ["Детская одежда", 0.2],
+    ["Кроссовки", 1.1], ["Кеды", 0.9], ["Ботинки", 1.4], ["Сапоги", 1.6], ["Тапочки", 0.4], ["Сланцы", 0.35],
+    ["Сумка", 0.6], ["Рюкзак", 0.8], ["Кошелёк", 0.15], ["Чемодан", 3.5], ["Зонт", 0.4],
+    ["Чехол для телефона", 0.05], ["Кабель", 0.1], ["Зарядка", 0.15], ["Наушники", 0.15], ["Повербанк", 0.35],
+    ["Колонка", 0.5], ["Клавиатура", 0.6], ["Мышь", 0.15], ["Лампа", 0.4], ["Ночник", 0.2], ["Смарт-часы", 0.1],
+    ["Кружка", 0.4], ["Термос", 0.5], ["Бутылка для воды", 0.3], ["Набор посуды", 1.5], ["Сковорода", 1.0],
+    ["Чайник", 1.2], ["Нож", 0.2], ["Контейнер для еды", 0.4], ["Органайзер", 0.5], ["Корзина для хранения", 0.5],
+    ["Постельное бельё", 1.6], ["Одеяло", 2.0], ["Подушка", 0.6], ["Плед", 1.0], ["Полотенце", 0.4], ["Шторы", 0.8],
+    ["Коврик", 0.8], ["Ковёр", 3.0], ["Ваза", 0.8], ["Фоторамка", 0.4], ["Свеча", 0.3], ["Швабра", 1.0], ["Фен", 0.8],
+    ["Косметика", 0.15], ["Бижутерия", 0.03], ["Часы", 0.15], ["Очки", 0.05],
+    ["Мягкая игрушка", 0.4], ["Конструктор", 0.8], ["Коврик для йоги", 1.0]
+  ];
+  var WEIGHT = {};
+  PRESETS.forEach(function (p) { WEIGHT[p[0].toLowerCase()] = p[1]; });
+  function presetWeight(name) {
+    var v = WEIGHT[String(name || "").trim().toLowerCase()];
+    return v == null ? null : v;
+  }
+
+  var DEF = {
+    card: "nofee", cardFee: 3, vat: 16, cny: RATES.cny, usd: RATES.usd, ratesEdited: false,
+    cargoName: "Мой карго", cargoTariff: 3.5, janaTariff: 4.09
+  };
+  var S = Object.assign({}, DEF);
+  var nextId = 1;
+  var items = [];
+  var examples = true;
+
+  function mk(type, price, qty) {
+    var w = presetWeight(type);
+    return { id: nextId++, type: type || "", price: price || "", qty: qty || "1", weight: w == null ? "" : String(w), free: true };
+  }
+  function seed() {
+    items = [mk("Футболка", "35"), mk("Худи", "150"), mk("Чайник", "80")];
+    examples = true;
+  }
+
+  function load() {
+    try {
+      var raw = localStorage.getItem("pdd-calc-v3");
+      if (raw) {
+        var d = JSON.parse(raw);
+        if (d && d.S) { S = Object.assign({}, DEF, d.S); }
+        if (!S.ratesEdited) { S.cny = RATES.cny; S.usd = RATES.usd; }
+        if (String(S.janaTariff) === "3.95") S.janaTariff = DEF.janaTariff;
+        if (d && d.items && d.items.length) { items = d.items; nextId = d.nextId || (items.length + 1); examples = !!d.examples; return; }
+      }
+    } catch (e) {}
+    seed();
+  }
+  function save() {
+    try { localStorage.setItem("pdd-calc-v3", JSON.stringify({ S: S, items: items, nextId: nextId, examples: examples })); } catch (e) {}
+  }
+
+  function num(v) {
+    var n = parseFloat(String(v).replace(",", ".").replace(/\s/g, ""));
+    return isFinite(n) && n > 0 ? n : 0;
+  }
+  function fmt(n) {
+    return Math.round(n).toLocaleString("ru-RU").replace(/ /g, " ") + " ₸";
+  }
+  function fmtKg(n) {
+    return (Math.round(n * 100) / 100).toString().replace(".", ",") + " кг";
+  }
+  function esc(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  /* price: цена товара (для бесплатной доставки уже с НДС и комиссией), ship: доставка, total: сумма.
+     Карго и Jana Post без веса посчитать нельзя: для них null. */
+  function calc(it) {
+    var price = num(it.price);
+    var qty = Math.max(1, Math.round(num(it.qty)) || 1);
+    var w = num(it.weight);
+    var P = price * qty * num(S.cny);
+    var W = w * qty;
+    var fee = S.card === "fee" ? num(S.cardFee) / 100 : 0;
+    var vat = num(S.vat) / 100;
+    var A = (1 + vat) * (1 + fee);
+    var T = num(S.cargoTariff) * num(S.usd);
+    var jT = num(S.janaTariff) * num(S.usd);
+    return {
+      P: P, W: W, qty: qty,
+      free: it.free ? { price: P * A, ship: 0, total: P * A } : null,
+      cargo: W > 0 ? { price: P, ship: W * T, total: P + W * T } : null,
+      jana: W > 0 ? { price: P, ship: W * jT, total: P + W * jT } : null,
+      be: (it.free && T > 0) ? P * (A - 1) / T : null
+    };
+  }
+
+  function cargoLabel() { return (S.cargoName || "").trim() || "Карго"; }
+  function titleOf(it, r) { return ((it.type || "").trim() || "Товар") + " ×" + r.qty; }
+
+  function fillDatalist() {
+    document.getElementById("products").innerHTML = PRESETS.map(function (p) {
+      return '<option value="' + esc(p[0]) + '"></option>';
+    }).join("");
+  }
+
+  function renderList() {
+    var list = document.getElementById("list");
+    list.innerHTML = "";
+    items.forEach(function (it) {
+      var el = document.createElement("article");
+      el.className = "item";
+      el.setAttribute("data-id", it.id);
+      el.innerHTML =
+        '<div class="top">' +
+          '<input class="type" id="type-' + it.id + '" type="text" list="products" autocomplete="off" placeholder="Что за товар? Например: футболка" aria-label="Название товара">' +
+          '<button class="del" type="button" aria-label="Удалить товар">×</button>' +
+        '</div>' +
+        '<div class="fields three">' +
+          '<label class="f">Цена, ¥<input class="price" id="price-' + it.id + '" type="text" inputmode="decimal" placeholder="0"></label>' +
+          '<label class="f">Штук<input class="qty" id="qty-' + it.id + '" type="text" inputmode="numeric"></label>' +
+          '<label class="f">Вес 1 шт., кг<input class="weight" id="weight-' + it.id + '" type="text" inputmode="decimal" placeholder="впиши"></label>' +
+        '</div>' +
+        '<label class="chk"><input class="free" type="checkbox"> На товаре есть значок Free Shipping</label>' +
+        '<div class="res">' +
+          '<div class="opt" data-k="free"><span class="l">Бесплатная</span><span class="v">—</span></div>' +
+          '<div class="opt" data-k="cargo"><span class="l cn"></span><span class="v">—</span></div>' +
+          '<div class="opt" data-k="jana"><span class="l">Jana Post</span><span class="v">—</span></div>' +
+        '</div>' +
+        '<p class="verdict"></p>';
+      list.appendChild(el);
+      el.querySelector(".type").value = it.type;
+      el.querySelector(".price").value = it.price;
+      el.querySelector(".qty").value = it.qty;
+      el.querySelector(".weight").value = it.weight;
+      el.querySelector(".free").checked = it.free;
+    });
+  }
+
+  function findItem(el) {
+    var art = el.closest(".item");
+    if (!art) return null;
+    var id = Number(art.getAttribute("data-id"));
+    for (var i = 0; i < items.length; i++) if (items[i].id === id) return items[i];
+    return null;
+  }
+
+  function recalc() {
+    var totals = { mix: 0, free: 0, cargo: 0, jana: 0 };
+    var allFree = true, allCargo = true, allJana = true, anyPriced = false;
+    var plan = [];
+    var cn = cargoLabel();
+    items.forEach(function (it) {
+      var art = document.querySelector('.item[data-id="' + it.id + '"]');
+      if (!art) return;
+      var r = calc(it);
+      var priced = r.P > 0;
+      var opts = [];
+      if (r.free) opts.push({ k: "free", l: "Бесплатная доставка", o: r.free });
+      if (r.cargo) opts.push({ k: "cargo", l: cn, o: r.cargo });
+      if (r.jana) opts.push({ k: "jana", l: "Jana Post", o: r.jana });
+      var best = opts.slice().sort(function (a, b) { return a.o.total - b.o.total; });
+      art.querySelectorAll(".cn").forEach(function (n) { n.textContent = cn; });
+      art.querySelectorAll(".opt").forEach(function (o) {
+        var k = o.getAttribute("data-k");
+        var val = r[k];
+        o.classList.toggle("off", !val);
+        o.classList.toggle("best", priced && best.length > 0 && best[0].k === k);
+        o.querySelector(".v").textContent = !priced ? "—" : (val ? fmt(val.total) : (k === "free" ? "нет" : "нужен вес"));
+      });
+      var vd = art.querySelector(".verdict");
+      if (!priced) {
+        vd.textContent = "Введи цену товара в юанях.";
+      } else if (!best.length) {
+        vd.textContent = "Введи вес товара: без него карго и Jana Post посчитать нельзя, а бесплатной доставки на этом товаре нет.";
+      } else {
+        var txt = "<b>" + esc(best[0].l) + "</b>";
+        if (best.length > 1) txt += " дешевле следующего варианта на " + fmt(best[1].o.total - best[0].o.total) + ".";
+        if (!r.cargo) txt += " Введи вес, чтобы сравнить с карго.";
+        else if (r.be != null) txt += " Бесплатная доставка выгоднее " + esc(cn) + ", если вес больше " + fmtKg(r.be) + " (сейчас " + fmtKg(r.W) + ").";
+        vd.innerHTML = txt;
+        totals.mix += best[0].o.total;
+        if (r.cargo) totals.cargo += r.cargo.total; else allCargo = false;
+        if (r.jana) totals.jana += r.jana.total; else allJana = false;
+        if (r.free) totals.free += r.free.total; else allFree = false;
+        anyPriced = true;
+        plan.push({ t: titleOf(it, r), k: best[0].k, price: best[0].o.price, ship: best[0].o.ship, total: best[0].o.total });
+      }
+    });
+
+    var rows = [];
+    if (anyPriced) {
+      rows.push({ l: "Лучший вариант для каждого товара", v: totals.mix });
+      if (allFree) rows.push({ l: "Всё с бесплатной доставкой", v: totals.free });
+      if (allCargo) rows.push({ l: "Всё через " + cn, v: totals.cargo });
+      if (allJana) rows.push({ l: "Всё через Jana Post", v: totals.jana });
+    }
+    var tb = document.getElementById("sumRows");
+    var minV = rows.length ? Math.min.apply(null, rows.map(function (x) { return x.v; })) : 0;
+    tb.innerHTML = rows.length ? rows.map(function (x) {
+      return '<tr' + (x.v === minV ? ' class="best"' : '') + '><td>' + esc(x.l) + '</td><td>' + fmt(x.v) + '</td></tr>';
+    }).join("") : '<tr><td>Введи цены товаров, и здесь появится итог.</td><td></td></tr>';
+
+    var barTotal = document.getElementById("barTotal");
+    var barSave = document.getElementById("barSave");
+    var mixNote = document.getElementById("mixNote");
+    barTotal.textContent = fmt(totals.mix);
+    barSave.textContent = "";
+    mixNote.textContent = "";
+    if (anyPriced) {
+      var base = allFree ? totals.free : (allCargo ? totals.cargo : null);
+      var baseName = allFree ? "всё бесплатной доставкой" : "всё через " + cn;
+      if (base != null && base - totals.mix > 0.5) barSave.textContent = "Экономия " + fmt(base - totals.mix) + " против: " + baseName;
+      mixNote.textContent = "Лучший вариант собран из нескольких заказов: товары с бесплатной доставкой едут отдельно от карго.";
+    }
+
+    var GROUPS = [["free", "Бесплатная доставка"], ["cargo", cn], ["jana", "Jana Post"]];
+    var planHtml = "";
+    var rate = String(S.cny).replace(".", ",");
+    var text = "Pinduoduo: что и как заказывать\n(курс " + rate + " ₸ за ¥)\n";
+    var tsv = "Товар\tСпособ\tЦена, ₸\tДоставка, ₸\tИтого, ₸\n";
+    GROUPS.forEach(function (g) {
+      var sel = plan.filter(function (p) { return p.k === g[0]; });
+      if (!sel.length) return;
+      var sub = sel.reduce(function (s, p) { return s + p.total; }, 0);
+      planHtml += '<tr class="grp"><td>' + esc(g[1]) + '</td><td>' + fmt(sub) + '</td></tr>';
+      text += "\n" + g[1] + ":\n";
+      sel.forEach(function (p) {
+        planHtml += '<tr><td>' + esc(p.t) + '<div class="plan-sub">' + fmt(p.price) + ' + доставка ' + fmt(p.ship) + '</div></td><td>' + fmt(p.total) + '</td></tr>';
+        text += "• " + p.t + " — " + fmt(p.price) + " + доставка " + fmt(p.ship) + " = " + fmt(p.total) + "\n";
+        tsv += p.t + "\t" + g[1] + "\t" + Math.round(p.price) + "\t" + Math.round(p.ship) + "\t" + Math.round(p.total) + "\n";
+      });
+    });
+    text += "\nИтого примерно: " + fmt(totals.mix);
+    tsv += "Итого\t\t\t\t" + Math.round(totals.mix);
+    if (anyPriced) planHtml += '<tr class="tot"><td>Итого примерно</td><td>' + fmt(totals.mix) + '</td></tr>';
+    document.getElementById("planRows").innerHTML = anyPriced ? planHtml : '<tr><td>Введи цены товаров, и здесь появится план заказа.</td><td></td></tr>';
+    recalc.text = anyPriced ? text : "";
+    recalc.tsv = anyPriced ? tsv : "";
+
+    var rh = document.getElementById("ratesHint");
+    var src = RATES.live ? "Курс на " : "Курс Нацбанка на ";
+    var fx = "1 ¥ = " + String(RATES.cny).replace(".", ",") + " ₸, 1 $ = " + String(RATES.usd).replace(".", ",") + " ₸";
+    rh.textContent = S.ratesEdited ? "Стоят твои курсы. " + src + RATES.date + ": " + fx + "." : src + RATES.date + (RATES.live ? " (обновляется сам, рыночный). " : ". ") + "Можно поменять на свой.";
+    document.getElementById("ratesReset").hidden = !S.ratesEdited;
+    document.getElementById("exampleHint").hidden = !examples;
+    save();
+  }
+
+  function fillSettings() {
+    document.querySelectorAll('input[name="card"]').forEach(function (r) { r.checked = r.value === S.card; });
+    document.querySelectorAll("[data-s]").forEach(function (f) { f.value = S[f.getAttribute("data-s")]; });
+  }
+
+  function bindSettings() {
+    fillSettings();
+    document.querySelectorAll('input[name="card"]').forEach(function (r) {
+      r.addEventListener("change", function () { if (r.checked) { S.card = r.value; recalc(); } });
+    });
+    document.querySelectorAll("[data-s]").forEach(function (f) {
+      var key = f.getAttribute("data-s");
+      f.addEventListener("input", function () {
+        S[key] = f.value;
+        if (key === "cny" || key === "usd") S.ratesEdited = true;
+        recalc();
+      });
+    });
+    document.getElementById("ratesReset").addEventListener("click", function () {
+      S.cny = RATES.cny; S.usd = RATES.usd; S.ratesEdited = false;
+      fillSettings(); recalc();
+    });
+  }
+
+  function bindList() {
+    var list = document.getElementById("list");
+    list.addEventListener("input", function (e) {
+      var it = findItem(e.target); if (!it) return;
+      var c = e.target.classList;
+      if (c.contains("type")) {
+        it.type = e.target.value;
+        var w = presetWeight(it.type);
+        if (w != null) {
+          it.weight = String(w);
+          e.target.closest(".item").querySelector(".weight").value = it.weight;
+        }
+      } else if (c.contains("price")) it.price = e.target.value;
+      else if (c.contains("qty")) it.qty = e.target.value;
+      else if (c.contains("weight")) it.weight = e.target.value;
+      if (!c.contains("type") || it.type) examples = false;
+      recalc();
+    });
+    list.addEventListener("change", function (e) {
+      var it = findItem(e.target); if (!it) return;
+      if (e.target.classList.contains("free")) { it.free = e.target.checked; recalc(); }
+    });
+    list.addEventListener("click", function (e) {
+      if (!e.target.classList.contains("del")) return;
+      var it = findItem(e.target); if (!it) return;
+      items = items.filter(function (x) { return x.id !== it.id; });
+      if (!items.length) items.push(mk(""));
+      renderList(); recalc();
+    });
+  }
+
+  document.getElementById("add").addEventListener("click", function () {
+    items.push(mk(""));
+    renderList(); recalc();
+    var inputs = document.querySelectorAll("#list .type");
+    if (inputs.length) inputs[inputs.length - 1].focus();
+  });
+  document.getElementById("clear").addEventListener("click", function () {
+    items = [mk("")];
+    examples = false;
+    renderList(); recalc();
+  });
+
+  function copyOf(kind) {
+    var text = (kind === "tsv" ? recalc.tsv : recalc.text) || "";
+    var st = document.getElementById("copyStatus");
+    var box = document.getElementById("copybox");
+    if (!text) { st.textContent = "Сначала введи цены."; return; }
+    var done = function () { st.textContent = kind === "tsv" ? "Скопировано, можно вставлять в Google Таблицы или Excel." : "Скопировано как текст."; box.hidden = true; };
+    var fail = function () { box.hidden = false; box.value = text; box.focus(); box.select(); st.textContent = "Скопируй текст вручную."; };
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fail);
+      else fail();
+    } catch (e) { fail(); }
+  }
+  document.getElementById("copy").addEventListener("click", function () { copyOf("text"); });
+  document.getElementById("copyTsv").addEventListener("click", function () { copyOf("tsv"); });
+
+  fillDatalist();
+  load();
+  bindSettings();
+  renderList();
+  bindList();
+  recalc();
+
+  function fetchRates() {
+    if (!window.fetch) return;
+    var ctl = window.AbortController ? new AbortController() : null;
+    var timer = setTimeout(function () { if (ctl) ctl.abort(); }, 6000);
+    fetch("https://open.er-api.com/v6/latest/USD", ctl ? { signal: ctl.signal } : {})
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        clearTimeout(timer);
+        var k = j && j.rates && j.rates.KZT, c = j && j.rates && j.rates.CNY;
+        if (!(k > 100 && c > 3 && c < 15)) return;
+        var d = new Date();
+        RATES = { cny: Math.round(k / c * 100) / 100, usd: Math.round(k * 100) / 100,
+                  date: ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear(), live: true };
+        if (!S.ratesEdited) { S.cny = RATES.cny; S.usd = RATES.usd; fillSettings(); }
+        recalc();
+      })
+      .catch(function () { clearTimeout(timer); });
+  }
+  /* ---- Вход через Telegram и распознавание скриншотов ---- */
+  var BOT = "cute_pinduobot", API = "/.netlify/functions/";
+  var token = "";
+  try { token = localStorage.getItem("pdd-token") || ""; } catch (e) {}
+  function $(id) { return document.getElementById(id); }
+  function setErr(id, msg) { var e = $(id); e.textContent = msg || ""; e.hidden = !msg; }
+  function api(name, opts) {
+    opts = opts || {};
+    var h = { "content-type": "application/json" };
+    if (token) h.authorization = "Bearer " + token;
+    return fetch(API + name, { method: opts.body ? "POST" : "GET", headers: h, body: opts.body ? JSON.stringify(opts.body) : undefined })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { j._status = r.status; return j; }); });
+  }
+  function fmtDate(t) { var d = new Date(t); return ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2); }
+  function showStatus(st, name) {
+    var t = (name ? name + ". " : "");
+    if (st.plan === "trial") t += "Пробный период: осталось дней " + st.daysLeft + ", сегодня " + st.used + " из " + st.limit + " скриншотов.";
+    else if (st.plan === "paid") t += "Доступ до " + fmtDate(st.paidUntil) + ", в этом месяце " + st.used + " из " + st.limit + " скриншотов.";
+    else t += "Пробный период закончился. Платный доступ скоро появится, а обычный калькулятор остаётся бесплатным.";
+    $("scanStatus").textContent = t;
+    $("scanGo").disabled = st.plan === "expired" || st.left <= 0;
+  }
+  function showScanUi(loggedIn) { $("scanLogin").hidden = loggedIn; $("scanApp").hidden = !loggedIn; }
+  function logout() { token = ""; try { localStorage.removeItem("pdd-token"); } catch (e) {} showScanUi(false); }
+  function refreshMe() {
+    if (!token) { showScanUi(false); return; }
+    api("me").then(function (j) {
+      if (j._status === 200) { showScanUi(true); showStatus(j.status, j.name); }
+      else if (j._status === 401) logout();
+      else { showScanUi(false); setErr("loginErr", "Вход временно недоступен. Попробуй позже."); }
+    }).catch(function () { showScanUi(false); setErr("loginErr", "Вход временно недоступен. Попробуй позже."); });
+  }
+  window.onTelegramAuth = function (user) {
+    setErr("loginErr", "");
+    api("auth", { body: user }).then(function (j) {
+      if (j._status === 200 && j.token) {
+        token = j.token; try { localStorage.setItem("pdd-token", token); } catch (e) {}
+        showScanUi(true); showStatus(j.status, j.name);
+      } else setErr("loginErr", "Не получилось войти. Попробуй ещё раз.");
+    }).catch(function () { setErr("loginErr", "Вход временно недоступен. Попробуй позже."); });
+  };
+  var widgetAdded = false;
+  function addWidget() {
+    if (widgetAdded) return; widgetAdded = true;
+    var sc = document.createElement("script");
+    sc.async = true; sc.src = "https://telegram.org/js/telegram-widget.js?22";
+    sc.setAttribute("data-telegram-login", BOT); sc.setAttribute("data-size", "large");
+    sc.setAttribute("data-onauth", "onTelegramAuth(user)"); sc.setAttribute("data-request-access", "write");
+    $("tgBtn").appendChild(sc);
+  }
+  function setMode(m) {
+    $("scanBox").hidden = m !== "scan";
+    if (m === "scan") { addWidget(); refreshMe(); }
+  }
+  document.querySelectorAll('input[name="mode"]').forEach(function (r) {
+    r.addEventListener("change", function () { if (r.checked) setMode(r.value); });
+  });
+  $("scanOut").addEventListener("click", logout);
+
+  function shrink(file, maxSide, q) {
+    return new Promise(function (res, rej) {
+      var fr = new FileReader();
+      fr.onerror = function () { rej(new Error("read")); };
+      fr.onload = function () {
+        var im = new Image();
+        im.onerror = function () { rej(new Error("img")); };
+        im.onload = function () {
+          var k = Math.min(1, maxSide / Math.max(im.width, im.height));
+          var c = document.createElement("canvas");
+          c.width = Math.round(im.width * k); c.height = Math.round(im.height * k);
+          c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
+          res(c.toDataURL("image/jpeg", q).split(",")[1]);
+        };
+        im.src = fr.result;
+      };
+      fr.readAsDataURL(file);
+    });
+  }
+  var ERR = { auth: "Нужно войти заново.", expired: "Пробный период закончился.", limit: "На сегодня лимит скриншотов закончился.",
+    bad_image: "Не получилось обработать картинку. Попробуй другой скриншот.", upstream: "Не удалось распознать скриншот. Попытка не списана, попробуй ещё раз.",
+    unavailable: "Распознавание пока не настроено." };
+  $("scanGo").addEventListener("click", function () {
+    var f = $("scanFile").files[0];
+    setErr("scanErr", ""); $("scanMsg").textContent = "";
+    if (!f) { setErr("scanErr", "Выбери скриншот."); return; }
+    $("scanGo").disabled = true; $("scanMsg").textContent = "Читаю скриншот…";
+    shrink(f, 1600, 0.85).then(function (b) { return b.length > 2800000 ? shrink(f, 1200, 0.7) : b; })
+      .then(function (b) { return api("scan", { body: { image: b } }); })
+      .then(function (j) {
+        $("scanMsg").textContent = "";
+        if (j.status) showStatus(j.status);
+        if (j._status === 401) { logout(); return; }
+        if (j._status !== 200) { setErr("scanErr", ERR[j.error] || "Что-то пошло не так. Попробуй позже."); return; }
+        if (!j.items || !j.items.length) { setErr("scanErr", "Товары на скриншоте не нашлись. Попробуй скриншот корзины целиком."); return; }
+        if (examples) { items = []; examples = false; }
+        j.items.forEach(function (x) {
+          var it = mk(x.name, x.priceCny != null ? String(x.priceCny) : "", String(x.quantity || 1));
+          if (x.weightKg != null) it.weight = String(x.weightKg);
+          if (x.freeShipping === false) it.free = false;
+          items.push(it);
+        });
+        renderList(); recalc();
+        $("scanMsg").textContent = "Добавили товаров: " + j.items.length + ". Проверь цены и вес, это распознал ИИ, он может ошибаться.";
+      }).catch(function () { setErr("scanErr", "Не получилось прочитать картинку."); })
+      .then(function () { if (!$("scanApp").hidden) refreshMe(); });
+  });
+
+  fetchRates();
+})();
+</script>
+</body>
+</html>
